@@ -97,7 +97,7 @@ jobs:
           zip -r ../zygisk-detach-$VERSION.zip .
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: zygisk-detach
           path: zygisk-detach-*.zip
