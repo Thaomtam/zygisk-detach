@@ -1,23 +1,113 @@
-name: C/C++ CI
+name: Build zygisk-detach
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ master, main ]
+    tags: [ 'v*' ]
   pull_request:
-    branches: [ "master" ]
+    branches: [ master, main ]
+  workflow_dispatch:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v4
-    - name: configure
-      run: ./configure
-    - name: make
-      run: make
-    - name: make check
-      run: make check
-    - name: make distcheck
-      run: make distcheck
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK
+        run: |
+          sdkmanager --install "ndk;25.2.9519653"
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/25.2.9519653" >> $GITHUB_ENV
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+          target: aarch64-linux-android
+          components: rustfmt, clippy
+
+      - name: Add Rust targets
+        run: |
+          rustup target add aarch64-linux-android
+          rustup target add armv7-linux-androideabi
+          rustup target add i686-linux-android
+          rustup target add x86_64-linux-android
+
+      - name: Build Zygisk Module
+        run: |
+          cd zygisk
+          $ANDROID_NDK_HOME/ndk-build
+          mkdir -p ../magisk/zygisk
+          cp -f libs/arm64-v8a/libmodule.so ../magisk/zygisk/arm64-v8a.so
+          cp -f libs/armeabi-v7a/libmodule.so ../magisk/zygisk/armeabi-v7a.so
+          cp -f libs/x86/libmodule.so ../magisk/zygisk/x86.so
+          cp -f libs/x86_64/libmodule.so ../magisk/zygisk/x86_64.so
+
+      - name: Build CLI for arm64
+        run: |
+          cd cli
+          CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android33-clang \
+          cargo build --release-profile release-pr --target aarch64-linux-android
+          cp target/aarch64-linux-android/release-pr/cli ../magisk/detach-arm64
+
+      - name: Build CLI for arm
+        run: |
+          cd cli
+          CARGO_TARGET_ARMV7_LINUX_ANDROIDEABI_LINKER=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi33-clang \
+          cargo build --release-profile release-pr --target armv7-linux-androideabi
+          cp target/armv7-linux-androideabi/release-pr/cli ../magisk/detach-arm
+
+      - name: Build CLI for x86
+        run: |
+          cd cli
+          CARGO_TARGET_I686_LINUX_ANDROID_LINKER=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/i686-linux-android33-clang \
+          cargo build --release-profile release-pr --target i686-linux-android
+          cp target/i686-linux-android/release-pr/cli ../magisk/detach-x86
+
+      - name: Build CLI for x86_64
+        run: |
+          cd cli
+          CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android33-clang \
+          cargo build --release-profile release-pr --target x86_64-linux-android
+          cp target/x86_64-linux-android/release-pr/cli ../magisk/detach-x64
+
+      - name: Build WebUI
+        if: false  # Bỏ qua bước này nếu không cần WebUI
+        run: |
+          cd ksu-webui
+          npm install
+          npx parcel build src/index.html --dist-dir ../magisk/webroot
+
+      - name: Create Magisk Module
+        run: |
+          VERSION=$(grep 'version=' magisk/module.prop | cut -d= -f2)
+          cd magisk
+          chmod +x detach-*
+          zip -r ../zygisk-detach-$VERSION.zip .
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: zygisk-detach
+          path: zygisk-detach-*.zip
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: zygisk-detach-*.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
