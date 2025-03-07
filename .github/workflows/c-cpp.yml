@@ -48,22 +48,22 @@ jobs:
         run: |
           cd zygisk/jni
           cat > Android.mk << 'EOF'
-LOCAL_PATH := $(call my-dir)
+            LOCAL_PATH := $(call my-dir)
 
-include $(CLEAR_VARS)
-LOCAL_MODULE := module
-LOCAL_SRC_FILES := module.cpp parcel.cpp
-LOCAL_CFLAGS := -Wall -Wextra -Werror
-LOCAL_LDLIBS := -llog
-include $(BUILD_SHARED_LIBRARY)
-EOF
-          cat > Application.mk << 'EOF'
-APP_ABI := armeabi-v7a arm64-v8a x86 x86_64
-APP_PLATFORM := android-23
-APP_STL := c++_static
-APP_CPPFLAGS := -std=c++17
-EOF
-          ls -la
+            include $(CLEAR_VARS)
+            LOCAL_MODULE := module
+            LOCAL_SRC_FILES := module.cpp parcel.cpp
+            LOCAL_CFLAGS := -Wall -Wextra -Werror
+            LOCAL_LDLIBS := -llog
+            include $(BUILD_SHARED_LIBRARY)
+            EOF
+                    cat > Application.mk << 'EOF'
+            APP_ABI := armeabi-v7a arm64-v8a x86 x86_64
+            APP_PLATFORM := android-23
+            APP_STL := c++_static
+            APP_CPPFLAGS := -std=c++17
+            EOF
+                    ls -la
 
       - name: Build Zygisk Module
         run: |
@@ -151,4 +151,4 @@ EOF
           draft: false
           prerelease: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
