@@ -44,50 +44,54 @@ jobs:
           rustup target add i686-linux-android
           rustup target add x86_64-linux-android
 
+      - name: Create Android.mk
+        run: |
+          cd zygisk/jni
+          cat > Android.mk << 'EOF'
+LOCAL_PATH := $(call my-dir)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := module
+LOCAL_SRC_FILES := module.cpp parcel.cpp
+LOCAL_CFLAGS := -Wall -Wextra -Werror
+LOCAL_LDLIBS := -llog
+include $(BUILD_SHARED_LIBRARY)
+EOF
+          cat > Application.mk << 'EOF'
+APP_ABI := armeabi-v7a arm64-v8a x86 x86_64
+APP_PLATFORM := android-23
+APP_STL := c++_static
+APP_CPPFLAGS := -std=c++17
+EOF
+          ls -la
+
       - name: Build Zygisk Module
         run: |
           cd zygisk
-          # Kiểm tra cấu trúc thư mục
-          ls -la
-          # Kiểm tra xem có file Android.mk không
-          if [ -f "Android.mk" ]; then
-            echo "Found Android.mk"
-          else
-            echo "Android.mk not found"
-            # Kiểm tra thư mục jni
-            if [ -d "jni" ]; then
-              echo "Found jni directory"
-              cd jni
-              ls -la
-              # Sử dụng NDK_PROJECT_PATH để chỉ định thư mục dự án
-              $ANDROID_NDK_HOME/ndk-build NDK_PROJECT_PATH=$GITHUB_WORKSPACE/zygisk
-            else
-              echo "jni directory not found"
-              exit 1
-            fi
-          fi
+          $ANDROID_NDK_HOME/ndk-build -C jni
           
           # Tạo thư mục đích
-          mkdir -p $GITHUB_WORKSPACE/magisk/zygisk
+          mkdir -p ../magisk/zygisk
           
           # Kiểm tra và sao chép các file .so
           if [ -d "libs" ]; then
             echo "Found libs directory"
             ls -la libs
             if [ -d "libs/arm64-v8a" ]; then
-              cp -f libs/arm64-v8a/libmodule.so $GITHUB_WORKSPACE/magisk/zygisk/arm64-v8a.so
+              cp -f libs/arm64-v8a/libmodule.so ../magisk/zygisk/arm64-v8a.so
             fi
             if [ -d "libs/armeabi-v7a" ]; then
-              cp -f libs/armeabi-v7a/libmodule.so $GITHUB_WORKSPACE/magisk/zygisk/armeabi-v7a.so
+              cp -f libs/armeabi-v7a/libmodule.so ../magisk/zygisk/armeabi-v7a.so
             fi
             if [ -d "libs/x86" ]; then
-              cp -f libs/x86/libmodule.so $GITHUB_WORKSPACE/magisk/zygisk/x86.so
+              cp -f libs/x86/libmodule.so ../magisk/zygisk/x86.so
             fi
             if [ -d "libs/x86_64" ]; then
-              cp -f libs/x86_64/libmodule.so $GITHUB_WORKSPACE/magisk/zygisk/x86_64.so
+              cp -f libs/x86_64/libmodule.so ../magisk/zygisk/x86_64.so
             fi
           else
             echo "libs directory not found"
+            ls -la
             exit 1
           fi
 
